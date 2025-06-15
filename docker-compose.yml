@@ -1,0 +1,277 @@
+version: '3.8'
+
+services:
+  # ================================
+  # INFRASTRUCTURE
+  # ================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: crypto-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crypto-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: crypto-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 3
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crypto-network
+
+  minio:
+    image: minio/minio:latest
+    hostname: minio
+    container_name: crypto-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - crypto-network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: crypto-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 admin password123;
+      mc mb myminio/datalake --ignore-existing;
+      echo 'MinIO buckets initialized';
+      "
+    networks:
+      - crypto-network
+
+  postgres:
+    image: postgres:15
+    hostname: postgres
+    container_name: crypto-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dagster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dagster_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dagster}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dagster}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crypto-network
+
+  # ================================
+  # SPARK CLUSTER
+  # ================================
+  spark-master:
+    image: bitnami/spark:3.4
+    hostname: spark-master
+    container_name: crypto-spark-master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+    volumes:
+      - ./spark/jars:/opt/bitnami/spark/jars
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - crypto-network
+
+  spark-worker:
+    image: bitnami/spark:3.4
+    hostname: spark-worker
+    container_name: crypto-spark-worker
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY:-2G}
+      - SPARK_WORKER_CORES=${SPARK_WORKER_CORES:-2}
+    volumes:
+      - ./spark/jars:/opt/bitnami/spark/jars
+    networks:
+      - crypto-network
+
+  # ================================
+  # STREAMING SERVICE
+  # ================================
+  streaming-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.streaming
+    hostname: streaming-service
+    container_name: crypto-streaming-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ACTIVE_SYMBOLS: ${ACTIVE_SYMBOLS:-BTCUSDT,ETHUSDT}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      RECONNECT_INTERVAL: 5
+      PING_INTERVAL: 20
+      PYTHONPATH: /app
+    volumes:
+      - streaming-logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # ================================
+  # DAGSTER SERVICES
+  # ================================
+  dagster-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    hostname: dagster-webserver
+    container_name: crypto-dagster-webserver
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-dagster}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dagster_password}
+      DAGSTER_POSTGRES_DB: ${POSTGRES_DB:-dagster}
+      DAGSTER_POSTGRES_HOSTNAME: postgres
+      DAGSTER_POSTGRES_PORT: 5432
+      
+      # Pipeline configuration
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPARK_MASTER: spark://spark-master:7077
+      HUDI_BASE_PATH: s3a://datalake/
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
+      
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONPATH: /app
+      DAGSTER_HOME: /app/dagster_home
+    command: dagster-webserver -h 0.0.0.0 -p 3000
+    volumes:
+      - dagster-logs:/app/logs
+      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
+    networks:
+      - crypto-network
+
+  dagster-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    hostname: dagster-daemon
+    container_name: crypto-dagster-daemon
+    depends_on:
+      dagster-webserver:
+        condition: service_healthy
+    environment:
+      # Database
+      DAGSTER_POSTGRES_USER: ${POSTGRES_USER:-dagster}
+      DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dagster_password}
+      DAGSTER_POSTGRES_DB: ${POSTGRES_DB:-dagster}
+      DAGSTER_POSTGRES_HOSTNAME: postgres
+      DAGSTER_POSTGRES_PORT: 5432
+      
+      # Pipeline configuration
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPARK_MASTER: spark://spark-master:7077
+      HUDI_BASE_PATH: s3a://datalake/
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
+      
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONPATH: /app
+      DAGSTER_HOME: /app/dagster_home
+    command: dagster-daemon run
+    volumes:
+      - dagster-logs:/app/logs
+      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
+    networks:
+      - crypto-network
+
+# ================================
+# VOLUMES
+# ================================
+volumes:
+  zookeeper-data:
+  kafka-data:
+  minio-data:
+  postgres-data:
+  streaming-logs:
+  dagster-logs:
+
+# ================================
+# NETWORKS
+# ================================
+networks:
+  crypto-network:
+    driver: bridge

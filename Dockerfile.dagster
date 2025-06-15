@@ -1,0 +1,45 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies (Java for Spark client)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    netcat-openbsd \
+    openjdk-11-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Java environment
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH=$PATH:$JAVA_HOME/bin
+
+# Copy Dagster requirements
+COPY requirements-dagster.txt .
+RUN pip install --no-cache-dir -r requirements-dagster.txt
+
+# Copy application code
+COPY crypto_pipeline/ ./crypto_pipeline/
+COPY shared/ ./shared/
+COPY config/ ./config/
+
+# Create directories
+RUN mkdir -p /app/dagster_home /app/logs
+
+# Create app user
+RUN groupadd -r dagster && useradd -r -g dagster dagster
+RUN chown -R dagster:dagster /app
+USER dagster
+
+# Environment
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV DAGSTER_HOME=/app/dagster_home
+
+# Health check for webserver
+HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/server_info || exit 1
+
+# Default command
+CMD ["dagster-webserver", "-h", "0.0.0.0", "-p", "3000"]

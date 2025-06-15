@@ -1,0 +1,4 @@
+kafka-python==2.0.2
+websockets==11.0.3
+pyyaml==6.0.1
+structlog==23.2.0

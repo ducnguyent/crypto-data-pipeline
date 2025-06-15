@@ -1,0 +1,9 @@
+dagster==1.5.8
+dagster-webserver==1.5.8
+dagster-postgres==0.21.8
+pyspark==3.4.1
+kafka-python==2.0.2
+boto3==1.34.0
+pyyaml==6.0.1
+structlog==23.2.0
+psycopg2-binary==2.9.9
