@@ -1,0 +1,40 @@
+symbols:
+  # Tier 1 - High Priority (Always Active)
+  BTCUSDT:
+    name: "Bitcoin"
+    priority: 1
+    streams: ["trade", "ticker", "kline_1m", "depth5"]
+    
+  ETHUSDT:
+    name: "Ethereum"
+    priority: 1
+    streams: ["trade", "ticker", "kline_1m", "depth5"]
+    
+  # Tier 2 - Medium Priority
+  ADAUSDT:
+    name: "Cardano"
+    priority: 2
+    streams: ["trade", "ticker", "kline_1m"]
+    
+  DOTUSDT:
+    name: "Polkadot"
+    priority: 2
+    streams: ["trade", "ticker", "kline_1m"]
+    
+  LINKUSDT:
+    name: "Chainlink"
+    priority: 2
+    streams: ["trade", "ticker"]
+    
+  # Tier 3 - Lower Priority (Disabled by default)
+  SOLUSDT:
+    name: "Solana"
+    priority: 3
+    streams: ["trade", "ticker"]
+    enabled: false
+    
+  AVAXUSDT:
+    name: "Avalanche"
+    priority: 3
+    streams: ["trade", "ticker"]
+    enabled: false
