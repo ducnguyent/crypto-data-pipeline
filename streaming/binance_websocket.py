@@ -51,11 +51,10 @@ class BinanceWebSocketClient:
         """Process and enrich raw WebSocket message"""
         try:
             data = json.loads(raw_message)
-            stream = data.get('stream', '')
             event_data = data.get('data', data)
 
-            symbol = self._extract_symbol(stream)
-            stream_type = self._extract_stream_type(stream)
+            symbol = event_data.get('s', "UNKNOWN")
+            stream_type = event_data.get('e', 'unknown')
 
             processed_message = {
                 'record_id': str(uuid.uuid4()),
@@ -64,7 +63,7 @@ class BinanceWebSocketClient:
                 'event_time': event_data.get('E', int(datetime.now().timestamp() * 1000)),
                 'received_time': int(datetime.now().timestamp() * 1000),
                 'date': datetime.now().strftime('%Y-%m-%d'),
-                'raw_data': json.dumps(event_data),
+                'raw_data': json.dumps(data),
                 'data_quality_score': self._calculate_quality_score(event_data, stream_type)
             }
 
@@ -79,14 +78,6 @@ class BinanceWebSocketClient:
                 'received_time': int(datetime.now().timestamp() * 1000),
                 'data_quality_score': 0.0
             }
-
-    def _extract_symbol(self, stream: str) -> str:
-        """Extract symbol from stream name"""
-        return stream.split('@')[0].upper() if '@' in stream else 'UNKNOWN'
-
-    def _extract_stream_type(self, stream: str) -> str:
-        """Extract stream type from stream name"""
-        return stream.split('@')[1].split('@')[0] if '@' in stream else 'unknown'
 
     def _calculate_quality_score(self, data: Dict[str, Any], stream_type: str) -> float:
         """Calculate data quality score"""
