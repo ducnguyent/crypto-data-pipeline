@@ -10,8 +10,8 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! command -v docker-compose >/dev/null 2>&1; then
-    echo "❌ Docker Compose not found. Please install Docker Compose."
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    echo "❌ Docker Compose (V2) not found. Please install Docker with Compose plugin."
     exit 1
 fi
 
@@ -22,32 +22,27 @@ if [ ! -f ".env" ]; then
     echo "⚠️  Please review .env file and update passwords!"
 fi
 
-# Download Spark jars
-echo "📦 Downloading Spark jars..."
-chmod +x scripts/download_jars.sh
-./scripts/download_jars.sh
-
 # Create necessary directories
 mkdir -p logs dagster_home
 
 # Build images
 echo "🔨 Building Docker images..."
-docker-compose build
+docker compose build
 
 # Start infrastructure
 echo "🏗️ Starting infrastructure services..."
-docker-compose up -d zookeeper kafka minio postgres spark-master spark-worker
+docker compose up -d kafka minio postgres spark-master spark-worker
 
 # Wait for services
 echo "⏳ Waiting for services to be ready..."
 sleep 30
 
 # Initialize MinIO
-docker-compose up -d minio-init
+docker compose up -d minio-init
 
 # Start application services
 echo "🚀 Starting application services..."
-docker-compose up -d streaming-service dagster-webserver dagster-daemon
+docker compose up -d streaming-service dagster-webserver dagster-daemon
 
 echo "✅ Deployment complete!"
 echo ""

@@ -7,12 +7,13 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
+    wget \
     netcat-openbsd \
-    openjdk-11-jdk \
+    openjdk-17-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Java environment
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$PATH:$JAVA_HOME/bin
 
 # Copy Dagster requirements
@@ -25,7 +26,19 @@ COPY shared/ ./shared/
 COPY config/ ./config/
 
 # Create directories
-RUN mkdir -p /app/dagster_home /app/logs
+RUN mkdir -p /app/dagster_home /app/logs /app/spark/jars
+
+# Download required Spark jars
+RUN echo "Downloading Hudi Spark bundle..." && \
+    wget -O /app/spark/jars/hudi-spark3.4-bundle_2.12-0.14.0.jar \
+    https://repo1.maven.org/maven2/org/apache/hudi/hudi-spark3.4-bundle_2.12/0.14.0/hudi-spark3.4-bundle_2.12-0.14.0.jar && \
+    echo "Downloading AWS SDK..." && \
+    wget -O /app/spark/jars/aws-java-sdk-bundle-1.12.367.jar \
+    https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.367/aws-java-sdk-bundle-1.12.367.jar && \
+    echo "Downloading Hadoop AWS..." && \
+    wget -O /app/spark/jars/hadoop-aws-3.3.4.jar \
+    https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    echo "All Spark jars downloaded successfully!"
 
 # Create app user
 RUN groupadd -r dagster && useradd -r -g dagster dagster

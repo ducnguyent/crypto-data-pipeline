@@ -2,7 +2,6 @@ import logging
 from dagster import (
     Definitions,
     ScheduleDefinition,
-    DefaultSensorStatus,
     define_asset_job,
     AssetSelection
 )
