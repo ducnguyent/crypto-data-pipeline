@@ -188,7 +188,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PYTHONPATH: /app
       DAGSTER_HOME: /app/dagster_home
-    command: dagster-webserver -h 0.0.0.0 -p 3000
+    command: dagster-webserver -h 0.0.0.0 -p 3000 -m crypto_pipeline.definitions
     volumes:
       - dagster-logs:/app/logs
       - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
@@ -225,7 +225,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PYTHONPATH: /app
       DAGSTER_HOME: /app/dagster_home
-    command: dagster-daemon run
+    command: dagster-daemon run -m crypto_pipeline.definitions
     volumes:
       - dagster-logs:/app/logs
       - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
