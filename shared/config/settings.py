@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any
+from typing import List, Dict
 from dataclasses import dataclass, field
 from pathlib import Path
 import yaml

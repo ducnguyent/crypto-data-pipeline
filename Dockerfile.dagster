@@ -21,12 +21,11 @@ COPY requirements-dagster.txt .
 RUN pip install --no-cache-dir -r requirements-dagster.txt
 
 # Copy application code
-COPY crypto_pipeline/ ./crypto_pipeline/
+COPY app/ .
 COPY shared/ ./shared/
-COPY config/ ./config/
 
 # Create directories
-RUN mkdir -p /app/dagster_home /app/logs /app/spark/jars
+RUN mkdir -p /app/logs /app/spark/jars
 
 # Download required Spark jars
 RUN echo "Downloading Hudi Spark bundle..." && \

@@ -1,6 +1,5 @@
-from shared.settings import BaseConfig
+from shared.config.settings import BaseConfig
 import os
-from typing import List
 from dataclasses import dataclass, field
 import sys
 from pathlib import Path

@@ -22,9 +22,6 @@ if [ ! -f ".env" ]; then
     echo "⚠️  Please review .env file and update passwords!"
 fi
 
-# Create necessary directories
-mkdir -p logs dagster_home
-
 # Build images
 echo "🔨 Building Docker images..."
 docker compose build

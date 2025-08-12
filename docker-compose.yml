@@ -22,12 +22,11 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_NUM_PARTITIONS: 3
-      # Add the required CLUSTER_ID
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092"]
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -48,7 +47,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -62,11 +61,7 @@ services:
       minio:
         condition: service_healthy
     entrypoint: >
-      /bin/sh -c "
-      mc alias set myminio http://minio:9000 admin password123;
-      mc mb myminio/datalake --ignore-existing;
-      echo 'MinIO buckets initialized';
-      "
+      /bin/sh -c " mc alias set myminio http://minio:9000 admin password123; mc mb myminio/datalake --ignore-existing; echo 'MinIO buckets initialized'; "
     networks:
       - crypto-network
 
@@ -83,7 +78,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dagster}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dagster}" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -174,7 +169,7 @@ services:
       DAGSTER_POSTGRES_DB: ${POSTGRES_DB:-dagster}
       DAGSTER_POSTGRES_HOSTNAME: postgres
       DAGSTER_POSTGRES_PORT: 5432
-      
+
       # Pipeline configuration
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPARK_MASTER: spark://spark-master:7077
@@ -182,7 +177,7 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
-      
+
       # Environment
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -191,7 +186,6 @@ services:
     command: dagster-webserver -h 0.0.0.0 -p 3000 -m crypto_pipeline.definitions
     volumes:
       - dagster-logs:/app/logs
-      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
     networks:
       - crypto-network
 
@@ -211,7 +205,7 @@ services:
       DAGSTER_POSTGRES_DB: ${POSTGRES_DB:-dagster}
       DAGSTER_POSTGRES_HOSTNAME: postgres
       DAGSTER_POSTGRES_PORT: 5432
-      
+
       # Pipeline configuration
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPARK_MASTER: spark://spark-master:7077
@@ -219,7 +213,7 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-password123}
-      
+
       # Environment
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -228,7 +222,6 @@ services:
     command: dagster-daemon run -m crypto_pipeline.definitions
     volumes:
       - dagster-logs:/app/logs
-      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml
     networks:
       - crypto-network
 

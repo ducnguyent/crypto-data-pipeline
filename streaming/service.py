@@ -1,7 +1,7 @@
-from shared.logging_config import setup_logging
-from streaming.kafka_producer import StreamingProducer
-from streaming.binance_websocket import BinanceWebSocketClient
-from streaming.config import StreamingConfig
+from shared.logging.setup import setup_logging
+from streaming.core.kafka_producer import StreamingProducer
+from streaming.core.binance_websocket import BinanceWebSocketClient
+from streaming.core.config import StreamingConfig
 import asyncio
 import logging
 import signal

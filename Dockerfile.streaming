@@ -15,7 +15,6 @@ RUN pip install --no-cache-dir -r requirements-streaming.txt
 # Copy application code
 COPY streaming/ ./streaming/
 COPY shared/ ./shared/
-COPY config/ ./config/
 
 # Create app user
 RUN groupadd -r streaming && useradd -r -g streaming streaming
