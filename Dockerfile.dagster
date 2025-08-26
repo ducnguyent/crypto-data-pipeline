@@ -3,14 +3,15 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies (Java for Spark client)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    curl \
-    wget \
-    netcat-openbsd \
-    openjdk-17-jdk \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y \
+        gcc \
+        g++ \
+        curl \
+        wget \
+        netcat-openbsd \
+        default-jdk && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set Java environment
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
