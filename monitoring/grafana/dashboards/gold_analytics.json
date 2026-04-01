@@ -1,0 +1,123 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "title": "Portfolio Sharpe Ratio",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_sharpe_ratio",
+          "legendFormat": "{{symbol}}"
+        }
+      ]
+    },
+    {
+      "title": "Max Drawdown",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_max_drawdown",
+          "legendFormat": "{{symbol}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": -0.05 },
+              { "color": "yellow", "value": -0.15 },
+              { "color": "red", "value": -0.3 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "VaR (95%)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_var_95",
+          "legendFormat": "{{symbol}}"
+        }
+      ]
+    },
+    {
+      "title": "Signal Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_signal_count",
+          "legendFormat": "{{signal}}"
+        }
+      ]
+    },
+    {
+      "title": "Trading Signals Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_signal_score",
+          "legendFormat": "{{symbol}} score"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 35 },
+              { "color": "green", "value": 65 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Cross-Symbol Correlation",
+      "type": "heatmap",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_correlation",
+          "legendFormat": "{{symbol_1}} ↔ {{symbol_2}}"
+        }
+      ]
+    },
+    {
+      "title": "Realized Volatility",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "default" },
+      "targets": [
+        {
+          "expr": "pipeline_gold_realised_volatility",
+          "legendFormat": "{{symbol}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["crypto", "gold", "analytics"],
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "Gold Analytics Dashboard",
+  "uid": "crypto-gold-analytics",
+  "version": 1
+}

@@ -1,0 +1,52 @@
+groups:
+  - name: pipeline_alerts
+    rules:
+      # No records processed in 30 minutes
+      - alert: PipelineStalled
+        expr: increase(pipeline_records_processed_total[30m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline stalled — no records processed in 30m"
+          description: "The {{ $labels.layer }}/{{ $labels.asset }} asset has not processed any records in the last 30 minutes."
+
+      # Data quality below threshold
+      - alert: LowDataQuality
+        expr: pipeline_data_quality_score < 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low data quality for {{ $labels.symbol }}"
+          description: "Quality score {{ $value }} is below 0.5 for {{ $labels.layer }}/{{ $labels.symbol }}."
+
+      # Processing taking too long
+      - alert: SlowProcessing
+        expr: histogram_quantile(0.95, rate(pipeline_processing_duration_seconds_bucket[15m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow processing on {{ $labels.asset }}"
+          description: "p95 processing time is {{ $value }}s (threshold 300s)."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(pipeline_errors_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.asset }}"
+          description: "Error rate is {{ $value }}/s for {{ $labels.asset }}."
+
+      # Asset has not run in 2 hours
+      - alert: StaleAsset
+        expr: (time() - pipeline_last_run_timestamp) > 7200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Stale asset {{ $labels.asset }}"
+          description: "{{ $labels.layer }}/{{ $labels.asset }} last ran {{ $value | humanizeDuration }} ago."

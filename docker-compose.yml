@@ -225,6 +225,78 @@ services:
     networks:
       - crypto-network
 
+  # ================================
+  # MONITORING
+  # ================================
+  prometheus:
+    image: prom/prometheus:latest
+    hostname: prometheus
+    container_name: crypto-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - ./monitoring/alerting/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  grafana:
+    image: grafana/grafana:latest
+    hostname: grafana
+    container_name: crypto-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    hostname: alertmanager
+    container_name: crypto-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alerting/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  pipeline-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    hostname: pipeline-exporter
+    container_name: crypto-pipeline-exporter
+    command: python /app/monitoring/exporters/pipeline_metrics.py
+    ports:
+      - "8000:8000"
+    environment:
+      METRICS_PORT: "8000"
+      PYTHONPATH: /app
+    volumes:
+      - ./monitoring:/app/monitoring
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
 # ================================
 # VOLUMES
 # ================================
@@ -234,6 +306,8 @@ volumes:
   postgres-data:
   streaming-logs:
   dagster-logs:
+  prometheus-data:
+  grafana-data:
 
 # ================================
 # NETWORKS

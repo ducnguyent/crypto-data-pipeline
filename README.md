@@ -1,6 +1,6 @@
 # 🚀 Crypto Data Pipeline
 
-A real-time cryptocurrency data streaming pipeline that ingests live data from Binance WebSocket API through a medallion architecture foundation. Currently implements robust streaming infrastructure with bronze layer ingestion, with silver and gold layers planned for future development.
+A real-time cryptocurrency data streaming pipeline that ingests live data from Binance WebSocket API through a complete medallion architecture. Implements bronze (raw ingestion), silver (OHLCV + technical indicators), and gold (portfolio analytics, signals, risk metrics) layers with full monitoring via Prometheus and Grafana.
 
 ## 🏗️ Current Architecture
 
@@ -8,15 +8,18 @@ A real-time cryptocurrency data streaming pipeline that ingests live data from B
 graph LR
     A[Binance WebSocket] --> B[Kafka Topics]
     B --> C[Bronze Layer<br/>Hudi Tables]
-    C -.-> D[Silver Layer<br/>Planned]
-    D -.-> E[Gold Layer<br/>Planned]
+    C --> D[Silver Layer<br/>OHLCV + Indicators]
+    D --> E[Gold Layer<br/>Analytics]
     
     F[Dagster] --> C
+    F --> D
+    F --> E
     G[Spark Cluster] --> C
     H[MinIO/S3] --> C
     
-    style D fill:#f9f,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style E fill:#f9f,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    I[Prometheus] --> J[Grafana]
+    K[Pipeline Exporter] --> I
+    I --> L[AlertManager]
 ```
 
 ## 🎯 What's Currently Working
@@ -78,11 +81,14 @@ This will:
 - **Dagster UI**: http://localhost:3000 (Pipeline orchestration)
 - **Spark UI**: http://localhost:8080 (Job monitoring)
 - **MinIO Console**: http://localhost:9001 (Data storage)
+- **Grafana**: http://localhost:3001 (Dashboards & monitoring)
+- **Prometheus**: http://localhost:9090 (Metrics)
+- **AlertManager**: http://localhost:9093 (Alert routing)
 
 ### 5. Monitor Pipeline
 ```bash
-./monitor.sh        # Basic service monitoring
-docker-compose logs -f binance-consumer  # Streaming logs
+./monitor.sh        # Comprehensive service monitoring
+docker-compose logs -f streaming-service  # Streaming logs
 ```
 
 ## 📂 Project Structure
@@ -166,30 +172,30 @@ export ENVIRONMENT="development"
 
 ## 🚧 Development Roadmap
 
-### Phase 1: Core Data Processing (In Progress)
-- [ ] **Silver Layer Implementation**
-  - [ ] OHLCV data aggregation (1m, 5m, 15m, 1h, 4h, 1d)
-  - [ ] Technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
-  - [ ] Data quality filtering and validation
-  - [ ] Multi-timeframe processing
+### Phase 1: Core Data Processing ✅
+- [x] **Silver Layer Implementation**
+  - [x] OHLCV data aggregation (1m, 5m, 15m, 1h, 4h, 1d)
+  - [x] Technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
+  - [x] Data quality filtering and validation
+  - [x] Multi-timeframe processing
 
-- [ ] **Enhanced Bronze Layer**
-  - [ ] Additional stream types (ticker, kline, depth)
-  - [ ] Improved data quality scoring
-  - [ ] Better error handling and recovery
+- [x] **Enhanced Bronze Layer**
+  - [x] Additional stream types (ticker, kline, depth)
+  - [x] Improved data quality scoring
+  - [x] Better error handling and recovery
 
-### Phase 2: Analytics Foundation (Planned)
-- [ ] **Gold Layer Implementation**
-  - [ ] Portfolio performance metrics
-  - [ ] Market correlation analysis
-  - [ ] Trading signal generation
-  - [ ] Risk metrics calculation
+### Phase 2: Analytics Foundation ✅
+- [x] **Gold Layer Implementation**
+  - [x] Portfolio performance metrics (Sharpe, Sortino, drawdown)
+  - [x] Market correlation analysis (cross-symbol, beta)
+  - [x] Trading signal generation (composite scoring)
+  - [x] Risk metrics calculation (VaR, volatility, liquidity)
 
-- [ ] **Advanced Monitoring**
-  - [ ] Real-time dashboards
-  - [ ] Data quality reports
-  - [ ] Performance metrics
-  - [ ] Alerting system
+- [x] **Advanced Monitoring**
+  - [x] Real-time dashboards (Grafana)
+  - [x] Data quality reports (quality_assets)
+  - [x] Performance metrics (Prometheus exporter)
+  - [x] Alerting system (AlertManager)
 
 ### Phase 3: Production Features (Future)
 - [ ] **Cloud Integration**
@@ -351,12 +357,13 @@ docker-compose ps            # Check service status
 ## 🎯 Current Status
 
 ✅ **Real-time Data Streaming** - Production ready  
-✅ **Bronze Layer Ingestion** - Functional for trade data  
+✅ **Bronze Layer Ingestion** - All stream types (trade, ticker, kline, depth)  
+✅ **Silver Layer Processing** - OHLCV + technical indicators  
+✅ **Gold Layer Analytics** - Portfolio, correlation, signals, risk  
+✅ **Data Quality** - Cross-layer quality reporting  
 ✅ **Infrastructure** - Complete Docker setup  
 ✅ **Configuration Management** - Flexible symbol configuration  
-🚧 **Silver Layer Processing** - In development  
-🚧 **Gold Layer Analytics** - Planned  
-🚧 **Advanced Monitoring** - Basic implementation  
+✅ **Advanced Monitoring** - Prometheus + Grafana + AlertManager  
 
 ---
 
