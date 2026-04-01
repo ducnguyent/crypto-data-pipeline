@@ -15,8 +15,12 @@ class BronzeAssetConfig(Config):
     batch_size: int = 1000
 
 
-def get_bronze_schema() -> StructType:
-    """Define schema for bronze layer data"""
+# ========================================
+# Schemas
+# ========================================
+
+def get_bronze_trade_schema() -> StructType:
+    """Define schema for bronze trade data"""
     return StructType([
         StructField("record_id", StringType(), False),
         StructField("symbol", StringType(), False),
@@ -25,55 +29,129 @@ def get_bronze_schema() -> StructType:
         StructField("received_time", LongType(), False),
         StructField("date", StringType(), False),
         StructField("raw_data", StringType(), True),
-        StructField("data_quality_score", DoubleType(), True)
+        StructField("data_quality_score", DoubleType(), True),
+        StructField("price", DoubleType(), True),
+        StructField("quantity", DoubleType(), True),
+        StructField("trade_id", LongType(), True),
+        StructField("is_buyer_maker", BooleanType(), True),
     ])
 
 
-@asset(
-    name="bronze_trade_data",
-    description="Raw trade data from Kafka streams ingested into bronze Hudi tables",
-    group_name="bronze_layer",
-    compute_kind="spark"
-)
-def bronze_trade_data(context: OpExecutionContext, config: BronzeAssetConfig):
-    """Ingest trade data from Kafka to bronze Hudi tables"""
+def get_bronze_ticker_schema() -> StructType:
+    """Define schema for bronze ticker data"""
+    return StructType([
+        StructField("record_id", StringType(), False),
+        StructField("symbol", StringType(), False),
+        StructField("stream_type", StringType(), False),
+        StructField("event_time", LongType(), False),
+        StructField("received_time", LongType(), False),
+        StructField("date", StringType(), False),
+        StructField("raw_data", StringType(), True),
+        StructField("data_quality_score", DoubleType(), True),
+        StructField("price_change", DoubleType(), True),
+        StructField("price_change_percent", DoubleType(), True),
+        StructField("last_price", DoubleType(), True),
+        StructField("volume", DoubleType(), True),
+        StructField("quote_volume", DoubleType(), True),
+    ])
 
-    spark = get_spark_session("BronzeTradeIngestion")
+
+def get_bronze_kline_schema() -> StructType:
+    """Define schema for bronze kline (candlestick) data"""
+    return StructType([
+        StructField("record_id", StringType(), False),
+        StructField("symbol", StringType(), False),
+        StructField("stream_type", StringType(), False),
+        StructField("event_time", LongType(), False),
+        StructField("received_time", LongType(), False),
+        StructField("date", StringType(), False),
+        StructField("raw_data", StringType(), True),
+        StructField("data_quality_score", DoubleType(), True),
+        StructField("interval", StringType(), True),
+        StructField("open", DoubleType(), True),
+        StructField("high", DoubleType(), True),
+        StructField("low", DoubleType(), True),
+        StructField("close", DoubleType(), True),
+        StructField("volume", DoubleType(), True),
+        StructField("is_closed", BooleanType(), True),
+    ])
+
+
+def get_bronze_depth_schema() -> StructType:
+    """Define schema for bronze depth (order book) data"""
+    return StructType([
+        StructField("record_id", StringType(), False),
+        StructField("symbol", StringType(), False),
+        StructField("stream_type", StringType(), False),
+        StructField("event_time", LongType(), False),
+        StructField("received_time", LongType(), False),
+        StructField("date", StringType(), False),
+        StructField("raw_data", StringType(), True),
+        StructField("data_quality_score", DoubleType(), True),
+        StructField("bids", StringType(), True),
+        StructField("asks", StringType(), True),
+        StructField("bid_count", IntegerType(), True),
+        StructField("ask_count", IntegerType(), True),
+        StructField("best_bid", DoubleType(), True),
+        StructField("best_ask", DoubleType(), True),
+        StructField("spread", DoubleType(), True),
+    ])
+
+
+# ========================================
+# Shared helpers
+# ========================================
+
+def _ingest_from_kafka(
+    context: OpExecutionContext,
+    config: BronzeAssetConfig,
+    topic_suffix: str,
+    schema: StructType,
+    table_prefix: str,
+) -> dict:
+    """Generic Kafka → Hudi ingestion for bronze layer.
+
+    Returns a metadata dict with status, table_name and record_count.
+    """
+    spark = get_spark_session(f"Bronze{table_prefix.title()}Ingestion")
 
     try:
-        context.log.info(f"Processing bronze trade data for {config.symbol}")
+        topic = f"crypto_raw_{config.symbol.lower()}_{topic_suffix}"
+        context.log.info(f"Reading from topic {topic}")
 
-        # Read from Kafka (batch processing for now)
-        topic = f"crypto_raw_{config.symbol.lower()}_trade"
-
-        df = spark \
-            .read \
-            .format("kafka") \
-            .option("kafka.bootstrap.servers", "kafka:29092") \
-            .option("subscribe", topic) \
-            .option("startingOffsets", "earliest") \
-            .option("endingOffsets", "latest") \
+        df = (
+            spark.read
+            .format("kafka")
+            .option("kafka.bootstrap.servers", "kafka:29092")
+            .option("subscribe", topic)
+            .option("startingOffsets", "earliest")
+            .option("endingOffsets", "latest")
             .load()
+        )
 
         if df.count() == 0:
             context.log.info(f"No new data found in topic {topic}")
             return {"status": "no_data", "topic": topic}
 
-        # Parse Kafka messages
+        # Parse Kafka value as JSON with the provided schema
         parsed_df = df.select(
-            from_json(col("value").cast("string"),
-                      get_bronze_schema()).alias("data"),
-            col("timestamp").alias("kafka_timestamp")
+            from_json(col("value").cast("string"), schema).alias("data"),
+            col("timestamp").alias("kafka_timestamp"),
         ).select("data.*", "kafka_timestamp")
 
-        # Add partitioning columns
-        enriched_df = parsed_df \
-            .withColumn("year", year(from_unixtime(col("event_time") / 1000))) \
-            .withColumn("month", month(from_unixtime(col("event_time") / 1000))) \
-            .withColumn("day", dayofmonth(from_unixtime(col("event_time") / 1000)))
+        # Filter out null records from parse failures
+        parsed_df = parsed_df.filter(col("record_id").isNotNull())
 
-        # Write to Hudi table
-        table_name = f"bronze_trade_{config.symbol.lower()}"
+        # Add time-based partitioning columns
+        enriched_df = (
+            parsed_df
+            .withColumn("year", year(from_unixtime(col("event_time") / 1000)))
+            .withColumn("month", month(from_unixtime(col("event_time") / 1000)))
+            .withColumn("day", dayofmonth(from_unixtime(col("event_time") / 1000)))
+        )
+
+        # Write to Hudi
+        table_name = f"bronze_{table_prefix}_{config.symbol.lower()}"
         table_path = f"s3a://datalake/bronze/{table_name}"
 
         hudi_options = get_hudi_write_config(table_name, "upsert")
@@ -85,60 +163,85 @@ def bronze_trade_data(context: OpExecutionContext, config: BronzeAssetConfig):
             .save(table_path)
 
         record_count = enriched_df.count()
-        context.log.info(
-            f"Successfully wrote {record_count} records to {table_name}")
+        context.log.info(f"Wrote {record_count} records to {table_name}")
 
         return {
             "status": "success",
             "table_name": table_name,
             "record_count": record_count,
-            "symbol": config.symbol
+            "symbol": config.symbol,
         }
 
     except Exception as e:
-        context.log.error(f"Error processing bronze trade data: {e}")
+        context.log.error(f"Error processing bronze {table_prefix} data: {e}")
         raise
     finally:
         spark.stop()
 
 
+# ========================================
+# Assets
+# ========================================
+
+@asset(
+    name="bronze_trade_data",
+    description="Raw trade data from Kafka streams ingested into bronze Hudi tables",
+    group_name="bronze_layer",
+    compute_kind="spark",
+)
+def bronze_trade_data(context: OpExecutionContext, config: BronzeAssetConfig):
+    """Ingest trade data from Kafka to bronze Hudi tables"""
+    return _ingest_from_kafka(
+        context, config,
+        topic_suffix="trade",
+        schema=get_bronze_trade_schema(),
+        table_prefix="trade",
+    )
+
+
 @asset(
     name="bronze_ticker_data",
-    description="Raw ticker data from Kafka streams",
+    description="Raw 24hr ticker data from Kafka streams ingested into bronze Hudi tables",
     group_name="bronze_layer",
-    compute_kind="spark"
+    compute_kind="spark",
 )
 def bronze_ticker_data(context: OpExecutionContext, config: BronzeAssetConfig):
     """Ingest ticker data from Kafka to bronze Hudi tables"""
-
-    context.log.info(f"Processing bronze ticker data for {config.symbol}")
-
-    # Similar implementation to bronze_trade_data but for ticker stream
-    # This is a placeholder - full implementation would be similar to above
-
-    return {
-        "status": "placeholder",
-        "table_name": f"bronze_ticker_{config.symbol.lower()}",
-        "symbol": config.symbol,
-        "stream_type": "ticker"
-    }
+    return _ingest_from_kafka(
+        context, config,
+        topic_suffix="24hrTicker",
+        schema=get_bronze_ticker_schema(),
+        table_prefix="ticker",
+    )
 
 
 @asset(
     name="bronze_kline_data",
-    description="Raw kline data from Kafka streams",
+    description="Raw kline (candlestick) data from Kafka streams ingested into bronze Hudi tables",
     group_name="bronze_layer",
-    compute_kind="spark"
+    compute_kind="spark",
 )
 def bronze_kline_data(context: OpExecutionContext, config: BronzeAssetConfig):
     """Ingest kline data from Kafka to bronze Hudi tables"""
+    return _ingest_from_kafka(
+        context, config,
+        topic_suffix="kline",
+        schema=get_bronze_kline_schema(),
+        table_prefix="kline",
+    )
 
-    context.log.info(f"Processing bronze kline data for {config.symbol}")
 
-    # Placeholder for kline data processing
-    return {
-        "status": "placeholder",
-        "table_name": f"bronze_kline_{config.symbol.lower()}",
-        "symbol": config.symbol,
-        "stream_type": "kline_1m"
-    }
+@asset(
+    name="bronze_depth_data",
+    description="Raw order-book depth snapshots from Kafka streams ingested into bronze Hudi tables",
+    group_name="bronze_layer",
+    compute_kind="spark",
+)
+def bronze_depth_data(context: OpExecutionContext, config: BronzeAssetConfig):
+    """Ingest depth data from Kafka to bronze Hudi tables"""
+    return _ingest_from_kafka(
+        context, config,
+        topic_suffix="depthUpdate",
+        schema=get_bronze_depth_schema(),
+        table_prefix="depth",
+    )

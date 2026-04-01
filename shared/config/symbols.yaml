@@ -32,9 +32,15 @@ symbols:
     priority: 3
     streams: ["trade", "ticker"]
     enabled: false
-    
+
   AVAXUSDT:
     name: "Avalanche"
     priority: 3
     streams: ["trade", "ticker"]
     enabled: false
+
+stream_definitions:
+  trade: "trade"
+  ticker: "ticker"
+  kline_1m: "kline_1m"
+  depth5: "depth5@100ms"

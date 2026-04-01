@@ -28,6 +28,15 @@ class BaseConfig:
 
     # Symbol configuration
     _symbol_configs: Dict[str, SymbolConfig] = field(default_factory=dict)
+    _stream_definitions: Dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self):
+        self._load_symbols_from_yaml()
+
+    @property
+    def stream_definitions(self) -> Dict[str, str]:
+        """Get stream definitions"""
+        return self._stream_definitions
 
     @property
     def active_symbols(self) -> List[str]:
@@ -51,6 +60,14 @@ class BaseConfig:
 
     def _load_symbols_from_yaml(self) -> None:
         """Load symbols from YAML configuration"""
+        # Default stream definitions
+        self._stream_definitions = {
+            "trade": "trade",
+            "ticker": "ticker",
+            "kline_1m": "kline_1m",
+            "depth5": "depth5@100ms"
+        }
+
         try:
             config_path = Path(__file__).parent / ".." / \
                 "config" / "symbols.yaml"
@@ -67,6 +84,12 @@ class BaseConfig:
                         streams=data.get(
                             "streams", ["trade", "ticker", "kline_1m"])
                     )
+
+            # Load stream definitions if present
+            stream_defs = config.get("stream_definitions")
+            if stream_defs and isinstance(stream_defs, dict):
+                self._stream_definitions.update(stream_defs)
+
         except FileNotFoundError:
             # Default symbols
             self._symbol_configs = {

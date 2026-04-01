@@ -6,8 +6,17 @@ from dagster import (
     AssetSelection
 )
 
-from .assets.bronze_assets import bronze_trade_data, bronze_ticker_data, bronze_kline_data
-from .assets.silver_assets import silver_ohlcv_1m, silver_trade_metrics
+from .assets.bronze_assets import (
+    bronze_trade_data,
+    bronze_ticker_data,
+    bronze_kline_data,
+    bronze_depth_data,
+)
+from .assets.silver_assets import (
+    silver_ohlcv_1m,
+    silver_ohlcv_multi_timeframe,
+    silver_trade_metrics,
+)
 from .assets.gold_assets import gold_portfolio_metrics, gold_bigquery_sync
 
 logger = logging.getLogger(__name__)
@@ -21,7 +30,7 @@ bronze_ingestion_job = define_asset_job(
 
 silver_processing_job = define_asset_job(
     name="silver_processing_job",
-    description="Process bronze data into clean silver layer",
+    description="Process bronze data into clean silver layer with indicators",
     selection=AssetSelection.groups("silver_layer")
 )
 
@@ -40,7 +49,7 @@ bronze_schedule = ScheduleDefinition(
 
 silver_schedule = ScheduleDefinition(
     job=silver_processing_job,
-    cron_schedule="0 */6 * * *",  # Every 6 hours
+    cron_schedule="*/30 * * * *",  # Every 30 minutes
     name="silver_processing_schedule"
 )
 
@@ -57,8 +66,10 @@ defs = Definitions(
         bronze_trade_data,
         bronze_ticker_data,
         bronze_kline_data,
-        # Silver layer (placeholders)
+        bronze_depth_data,
+        # Silver layer
         silver_ohlcv_1m,
+        silver_ohlcv_multi_timeframe,
         silver_trade_metrics,
         # Gold layer (placeholders)
         gold_portfolio_metrics,

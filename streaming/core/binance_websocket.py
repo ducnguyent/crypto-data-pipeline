@@ -20,13 +20,9 @@ class BinanceWebSocketClient:
         self.websocket = None
         self.running = False
         
-        # Map internal stream names to Binance stream names
-        self.stream_map = {
-            'trade': 'trade',
-            'ticker': 'ticker',  # Will produce 24hrTicker events
-            'kline_1m': 'kline_1m',  # Will produce kline events
-            'depth5': 'depth5'
-        }
+        
+        # Stream definitions are now loaded from config
+        self.stream_definitions = getattr(config, 'stream_definitions', {})
 
         logger.info(f"WebSocket client initialized for {len(symbols)} symbols")
 
@@ -37,14 +33,11 @@ class BinanceWebSocketClient:
         for symbol in self.symbols:
             symbol_lower = symbol.lower()
             for stream in self.streams:
-                if stream == "trade":
-                    stream_list.append(f"{symbol_lower}@trade")
-                elif stream == "ticker":
-                    stream_list.append(f"{symbol_lower}@ticker")  # 24hr ticker
-                elif stream == "kline_1m":
-                    stream_list.append(f"{symbol_lower}@kline_1m")
-                elif stream == "depth5":
-                    stream_list.append(f"{symbol_lower}@depth5@100ms")
+                stream_suffix = self.stream_definitions.get(stream)
+                if stream_suffix:
+                    stream_list.append(f"{symbol_lower}@{stream_suffix}")
+                else:
+                    logger.warning(f"Unknown stream definition for: {stream}")
 
         if not stream_list:
             raise ValueError("No valid streams configured")
@@ -121,6 +114,18 @@ class BinanceWebSocketClient:
                     'volume': float(kline_data.get('v', 0)),
                     'is_closed': kline_data.get('x', False)
                 })
+            elif stream_type == 'depthUpdate' or stream_name and 'depth' in stream_name:
+                bids = event_data.get('bids', event_data.get('b', []))
+                asks = event_data.get('asks', event_data.get('a', []))
+                processed_message.update({
+                    'bids': json.dumps(bids),
+                    'asks': json.dumps(asks),
+                    'bid_count': len(bids),
+                    'ask_count': len(asks),
+                    'best_bid': float(bids[0][0]) if bids else 0.0,
+                    'best_ask': float(asks[0][0]) if asks else 0.0,
+                    'spread': (float(asks[0][0]) - float(bids[0][0])) if bids and asks else 0.0
+                })
 
             return processed_message
 
@@ -174,6 +179,20 @@ class BinanceWebSocketClient:
                 for field in required_fields:
                     if field not in kline:
                         score -= 0.1
+
+        elif stream_type == "depthUpdate" or 'bids' in data or 'b' in data:
+            bids = data.get('bids', data.get('b', []))
+            asks = data.get('asks', data.get('a', []))
+            if not bids:
+                score -= 0.3
+            if not asks:
+                score -= 0.3
+            if bids and asks:
+                try:
+                    if float(bids[0][0]) <= 0 or float(asks[0][0]) <= 0:
+                        score -= 0.2
+                except (ValueError, TypeError, IndexError):
+                    score -= 0.2
 
         return max(0.0, score)
 

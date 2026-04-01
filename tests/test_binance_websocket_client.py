@@ -8,7 +8,7 @@ import websockets
 from typing import Dict, Any, List
 
 # Import the class to test
-from streaming.binance_websocket import BinanceWebSocketClient
+from streaming.core.binance_websocket import BinanceWebSocketClient
 
 
 @pytest.fixture
@@ -19,7 +19,14 @@ def mock_config():
     config.max_reconnect_attempts = 3
     config.ping_interval = 20
     config.ping_timeout = 10
+    config.ping_timeout = 10
     config.reconnect_interval = 5
+    config.stream_definitions = {
+        'trade': 'trade',
+        'ticker': 'ticker',
+        'kline_1m': 'kline_1m',
+        'depth5': 'depth5@100ms'
+    }
     return config
 
 
@@ -135,7 +142,8 @@ class TestDataQualityScoring:
             "E": 1640995200000,
             "s": "BTCUSDT",
             "p": "50000.00",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
@@ -146,7 +154,8 @@ class TestDataQualityScoring:
         data = {
             "s": "BTCUSDT",
             "p": "50000.00",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
@@ -157,7 +166,8 @@ class TestDataQualityScoring:
         data = {
             "E": 1640995200000,
             "p": "50000.00",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
@@ -168,7 +178,8 @@ class TestDataQualityScoring:
         data = {
             "E": 1640995200000,
             "s": "BTCUSDT",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
@@ -180,7 +191,8 @@ class TestDataQualityScoring:
             "E": 1640995200000,
             "s": "BTCUSDT",
             "p": "0.00",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
@@ -192,7 +204,8 @@ class TestDataQualityScoring:
             "E": 1640995200000,
             "s": "BTCUSDT",
             "p": "invalid_price",
-            "q": "0.001"
+            "q": "0.001",
+            "t": 12345
         }
 
         score = ws_client._calculate_quality_score(data, "trade")
